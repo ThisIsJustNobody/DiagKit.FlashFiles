@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/DiagKit.FlashFiles/DiagKit.FlashFiles.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/DiagKit.FlashFiles.Tests/DiagKit.FlashFiles.Tests.csproj" />
+  </Folder>
+</Solution>
