@@ -28,6 +28,30 @@ using var fromStream = FlashDocument.Load(stream, FlashFileType.Intel_MCS_86, da
 using var fromBytes = FlashDocument.Load(data, FlashFileType.Motorola_S_Record, dataSize: 1);
 ```
 
+## 严格与兼容解析
+
+默认解析行为保持严格。除非显式放宽，否则会验证校验和、Intel EOF 记录、Motorola 结束记录、记录类型长度、非数据记录地址字段、S-Record 头/计数记录以及 `DataSize` 对齐。
+
+```csharp
+var options = new FlashLoadOptions(dataSize: 2)
+{
+    // 仅建议在现场排查或兼容非标准供应商文件时使用。
+    ValidateChecksums = false,
+    RequireEndOfFile = false,
+    RecordsAfterEndOfFileBehavior = RecordsAfterEndOfFileBehavior.Parse,
+    ValidateNonDataRecordAddress = false,
+    ValidateRecordTypeLength = false,
+    ValidateDataRecordLength = false,
+    DataRecordPaddingValue = 0xFF,
+    ValidateMotorolaHeaderPosition = false,
+    ValidateMotorolaCountRecord = false,
+};
+
+using var lenient = FlashDocument.Load("supplier.hex", options);
+```
+
+`RecordsAfterEndOfFileBehavior.Reject` 保持默认标准行为；`Ignore` 在首次 EOF/结束记录后停止解析；`Parse` 会继续解析其后的有效记录。
+
 ## 核心 API
 
 ```csharp

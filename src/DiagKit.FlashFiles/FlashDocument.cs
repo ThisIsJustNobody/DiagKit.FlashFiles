@@ -44,8 +44,13 @@ public sealed class FlashDocument : IDisposable
 
     /// <summary>从文件路径加载 Flash 文档，根据扩展名自动检测格式。<br/>Loads a Flash document from a file path, auto-detecting the format by extension.</summary>
     public static FlashDocument Load(string filePath, byte dataSize, bool validateChecksums = true)
+        => Load(filePath, new FlashLoadOptions(dataSize) { ValidateChecksums = validateChecksums });
+
+    /// <summary>从文件路径加载 Flash 文档，根据扩展名自动检测格式。<br/>Loads a Flash document from a file path, auto-detecting the format by extension.</summary>
+    public static FlashDocument Load(string filePath, FlashLoadOptions options)
     {
         ArgumentNullException.ThrowIfNull(filePath);
+        ArgumentNullException.ThrowIfNull(options);
 
         var ext = Path.GetExtension(filePath).ToLowerInvariant();
         if (ext != ".hex" && ext != ".s19" && ext != ".s28" && ext != ".s37")
@@ -55,37 +60,47 @@ public sealed class FlashDocument : IDisposable
             throw new FileNotFoundException("文件不存在。", filePath);
         var blocks = ext switch
         {
-            ".s19" or ".s28" or ".s37" => MotorolaSRecord.Parser.Parse(File.ReadLines(filePath), dataSize, validateChecksums),
-            ".hex" => IntelMcs86.Parser.Parse(File.ReadLines(filePath), dataSize, validateChecksums),
+            ".s19" or ".s28" or ".s37" => MotorolaSRecord.Parser.Parse(File.ReadLines(filePath), options),
+            ".hex" => IntelMcs86.Parser.Parse(File.ReadLines(filePath), options),
             _ => throw new NotSupportedException($"不支持的文件格式：{ext}"),
         };
-        return new FlashDocument(blocks, dataSize);
+        return new FlashDocument(blocks, options.DataSize);
     }
 
     /// <summary>从流加载 Flash 文档，需指定格式。<br/>Loads a Flash document from a stream with a specified format.</summary>
     public static FlashDocument Load(Stream stream, FlashFileType format, byte dataSize, bool validateChecksums = true)
+        => Load(stream, format, new FlashLoadOptions(dataSize) { ValidateChecksums = validateChecksums });
+
+    /// <summary>从流加载 Flash 文档，需指定格式。<br/>Loads a Flash document from a stream with a specified format.</summary>
+    public static FlashDocument Load(Stream stream, FlashFileType format, FlashLoadOptions options)
     {
         ArgumentNullException.ThrowIfNull(stream);
+        ArgumentNullException.ThrowIfNull(options);
         var blocks = format switch
         {
-            FlashFileType.Intel_MCS_86 => IntelMcs86.Parser.Parse(stream, dataSize, validateChecksums),
-            FlashFileType.Motorola_S_Record => MotorolaSRecord.Parser.Parse(stream, dataSize, validateChecksums),
+            FlashFileType.Intel_MCS_86 => IntelMcs86.Parser.Parse(stream, options),
+            FlashFileType.Motorola_S_Record => MotorolaSRecord.Parser.Parse(stream, options),
             _ => throw new ArgumentOutOfRangeException(nameof(format)),
         };
-        return new FlashDocument(blocks, dataSize);
+        return new FlashDocument(blocks, options.DataSize);
     }
 
     /// <summary>从字节数据加载 Flash 文档，需指定格式。<br/>Loads a Flash document from byte data with a specified format.</summary>
     public static FlashDocument Load(ReadOnlySpan<byte> data, FlashFileType format, byte dataSize, bool validateChecksums = true)
+        => Load(data, format, new FlashLoadOptions(dataSize) { ValidateChecksums = validateChecksums });
+
+    /// <summary>从字节数据加载 Flash 文档，需指定格式。<br/>Loads a Flash document from byte data with a specified format.</summary>
+    public static FlashDocument Load(ReadOnlySpan<byte> data, FlashFileType format, FlashLoadOptions options)
     {
+        ArgumentNullException.ThrowIfNull(options);
         var lines = ReadLines(data);
         var blocks = format switch
         {
-            FlashFileType.Intel_MCS_86 => IntelMcs86.Parser.Parse(lines, dataSize, validateChecksums),
-            FlashFileType.Motorola_S_Record => MotorolaSRecord.Parser.Parse(lines, dataSize, validateChecksums),
+            FlashFileType.Intel_MCS_86 => IntelMcs86.Parser.Parse(lines, options),
+            FlashFileType.Motorola_S_Record => MotorolaSRecord.Parser.Parse(lines, options),
             _ => throw new ArgumentOutOfRangeException(nameof(format)),
         };
-        return new FlashDocument(blocks, dataSize);
+        return new FlashDocument(blocks, options.DataSize);
     }
 
     #endregion

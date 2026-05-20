@@ -34,7 +34,7 @@
     <PackageIcon>diagkit-flashfiles.png</PackageIcon>
 
     <!-- Release -->
-    <PackageReleaseNotes>Complete refactoring: new Load API, thread-safe parsing, O(log n) address lookup, Stream support, fixed CRC32 refOut bug.</PackageReleaseNotes>
+    <PackageReleaseNotes>Add configurable strict and lenient parsing options while keeping strict parsing as the default behavior.</PackageReleaseNotes>
 
     <!-- URL -->
     <PackageProjectUrl>https://github.com/ThisIsJustNobody/DiagKit.FlashFiles</PackageProjectUrl>

@@ -14,13 +14,33 @@ internal static class ParserBlockBuilder
     }
 
     internal static void AddSegment(List<ParsedDataSegment> segments, ulong startAddress, ReadOnlySpan<byte> data, byte dataSize, int lineNumber)
+        => AddSegment(segments, startAddress, data, dataSize, lineNumber, validateDataRecordLength: true, paddingValue: 0xFF);
+
+    internal static void AddSegment(
+        List<ParsedDataSegment> segments,
+        ulong startAddress,
+        ReadOnlySpan<byte> data,
+        byte dataSize,
+        int lineNumber,
+        bool validateDataRecordLength,
+        byte paddingValue)
     {
         if (data.IsEmpty)
             return;
-        if (data.Length % dataSize != 0)
+        var remainder = data.Length % dataSize;
+        if (remainder != 0 && validateDataRecordLength)
             throw new FormatException($"数据记录长度必须是 DataSize 的整数倍，行数：{lineNumber}。");
 
-        segments.Add(new ParsedDataSegment(startAddress, data.ToArray(), lineNumber));
+        if (remainder == 0)
+        {
+            segments.Add(new ParsedDataSegment(startAddress, data.ToArray(), lineNumber));
+            return;
+        }
+
+        var padded = new byte[data.Length + dataSize - remainder];
+        padded.AsSpan().Fill(paddingValue);
+        data.CopyTo(padded);
+        segments.Add(new ParsedDataSegment(startAddress, padded, lineNumber));
     }
 
     internal static List<FlashBlock> BuildBlocks(List<ParsedDataSegment> segments, byte dataSize)
