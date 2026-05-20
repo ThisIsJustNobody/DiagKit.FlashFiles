@@ -28,6 +28,30 @@ using var fromStream = FlashDocument.Load(stream, FlashFileType.Intel_MCS_86, da
 using var fromBytes = FlashDocument.Load(data, FlashFileType.Motorola_S_Record, dataSize: 1);
 ```
 
+## Strict and Lenient Parsing
+
+Parsing is strict by default. Checksums, Intel EOF records, Motorola termination records, record type lengths, non-data record address rules, S-Record header/count rules, and `DataSize` alignment are validated unless explicitly relaxed.
+
+```csharp
+var options = new FlashLoadOptions(dataSize: 2)
+{
+    // Use only for field diagnostics or compatibility with non-standard supplier files.
+    ValidateChecksums = false,
+    RequireEndOfFile = false,
+    RecordsAfterEndOfFileBehavior = RecordsAfterEndOfFileBehavior.Parse,
+    ValidateNonDataRecordAddress = false,
+    ValidateRecordTypeLength = false,
+    ValidateDataRecordLength = false,
+    DataRecordPaddingValue = 0xFF,
+    ValidateMotorolaHeaderPosition = false,
+    ValidateMotorolaCountRecord = false,
+};
+
+using var lenient = FlashDocument.Load("supplier.hex", options);
+```
+
+`RecordsAfterEndOfFileBehavior.Reject` preserves the default standard behavior, `Ignore` stops at the first EOF/termination record, and `Parse` continues reading valid records after it.
+
 ## Core API
 
 ```csharp

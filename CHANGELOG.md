@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.0.1-preview.1 - 2026-05-20
+
+- Added `FlashLoadOptions` and `RecordsAfterEndOfFileBehavior` for configurable strict and lenient parsing.
+- Added option-based `FlashDocument.Load` overloads for file paths, streams, and in-memory bytes.
+- Kept existing Load API and default parsing behavior strict and backward compatible.
+- Added explicit compatibility controls for EOF/termination requirements, records after EOF, checksums, Intel non-data record addresses, record type lengths, DataSize alignment, and Motorola S-Record header/count validation.
+- Documented strict defaults and lenient field-diagnostics usage.
+
 ## 1.0.0 - 2026-05-13
 
 - Initial stable release under the `DiagKit.FlashFiles` package identity.
