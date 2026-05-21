@@ -296,6 +296,79 @@ public sealed class FlashDocument : IDisposable
         }
     }
 
+    /// <summary>
+    /// 导出面向 UDS 传输的拥有数据块 DTO。<br/>Exports owned data block DTOs for UDS transfer.
+    /// </summary>
+    public IReadOnlyList<FlashBlockDto> ToUdsBlockDtos(FlashUdsExportOptions options)
+    {
+        ObjectDisposedException.ThrowIf(disposedValue, this);
+        ArgumentNullException.ThrowIfNull(options);
+        if (blocks.Count == 0)
+            return Array.Empty<FlashBlockDto>();
+        if (options.MaxBlockByteCount % DataSize != 0)
+            throw new ArgumentException("最大块字节数必须是 DataSize 的整数倍。", nameof(options));
+
+        var addressCount = options.MaxBlockByteCount / DataSize;
+        return options.FillGaps
+            ? ToUdsBlockDtosWithGaps(options, addressCount)
+            : ToUdsBlockDtosWithoutGaps(options, addressCount);
+    }
+
+    private IReadOnlyList<FlashBlockDto> ToUdsBlockDtosWithGaps(FlashUdsExportOptions options, uint addressCount)
+    {
+        var dtos = new List<FlashBlockDto>();
+        foreach (var page in EnumeratePages(addressCount, StartAddress, EndAddress, options.PaddingValue))
+        {
+            using (page)
+            {
+                if (options.SkipBlankBlocks && !page.HasValidData)
+                    continue;
+
+                var endAddress = page.StartAddress + page.AddressCount - 1;
+                EnsureUInt32Address(page.StartAddress, endAddress, options);
+                dtos.Add(new FlashBlockDto(page.StartAddress, page.Data, DataSize));
+            }
+        }
+
+        return dtos.AsReadOnly();
+    }
+
+    private IReadOnlyList<FlashBlockDto> ToUdsBlockDtosWithoutGaps(FlashUdsExportOptions options, uint addressCount)
+    {
+        var dtos = new List<FlashBlockDto>();
+        foreach (var block in blocks)
+        {
+            var remainingAddressCount = block.AddressCount;
+            var currentAddress = block.StartAddress;
+            var byteOffset = 0;
+
+            while (remainingAddressCount > 0)
+            {
+                var chunkAddressCount = Math.Min(addressCount, remainingAddressCount);
+                var chunkByteCount = checked((int)(chunkAddressCount * DataSize));
+                var endAddress = currentAddress + chunkAddressCount - 1;
+
+                EnsureUInt32Address(currentAddress, endAddress, options);
+                dtos.Add(new FlashBlockDto(currentAddress, block.Data.Span.Slice(byteOffset, chunkByteCount), DataSize));
+
+                remainingAddressCount -= chunkAddressCount;
+                byteOffset += chunkByteCount;
+                if (remainingAddressCount > 0)
+                    currentAddress += chunkAddressCount;
+            }
+        }
+
+        return dtos.AsReadOnly();
+    }
+
+    private static void EnsureUInt32Address(ulong startAddress, ulong endAddress, FlashUdsExportOptions options)
+    {
+        if (!options.RequireUInt32Address)
+            return;
+        if (startAddress > uint.MaxValue || endAddress > uint.MaxValue)
+            throw new ArgumentOutOfRangeException(nameof(options), "导出块地址必须位于 32-bit 范围内。");
+    }
+
     private static List<string> ReadLines(ReadOnlySpan<byte> data)
     {
         Span<byte> bom = stackalloc byte[] { 0xEF, 0xBB, 0xBF };
