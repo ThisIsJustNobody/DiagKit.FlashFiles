@@ -227,6 +227,18 @@ public sealed class FlashDocument : IDisposable
         blocks[index].WriteRange(startAddress, endAddress, data);
     }
 
+    /// <summary>
+    /// 导出拥有数据副本的块 DTO 列表。<br/>Exports block DTOs that own copied data buffers.
+    /// </summary>
+    public IReadOnlyList<FlashBlockDto> ToBlockDtos()
+    {
+        ObjectDisposedException.ThrowIf(disposedValue, this);
+        var dtos = new List<FlashBlockDto>(blocks.Count);
+        foreach (var block in blocks)
+            dtos.Add(block.ToDto());
+        return dtos.AsReadOnly();
+    }
+
     /// <summary>二分查找包含指定地址的块索引，未找到返回 -1。</summary>
     private int FindBlockIndex(ulong address)
     {

@@ -153,6 +153,15 @@ public sealed class FlashBlock : IDisposable
         return newFileName;
     }
 
+    /// <summary>
+    /// 导出拥有数据副本的 DTO。<br/>Exports a DTO that owns a copied data buffer.
+    /// </summary>
+    public FlashBlockDto ToDto()
+    {
+        ObjectDisposedException.ThrowIf(disposedValue, this);
+        return new FlashBlockDto(StartAddress, Data.Span, DataSize);
+    }
+
     /// <inheritdoc/>
     public void Dispose()
     {
