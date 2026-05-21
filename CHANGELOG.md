@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## Unreleased
+
+- Added `FlashLoadOptions.Strict`, `Lenient`, and `SupplierCompatible` profile factory methods.
+- Added `FlashBlockDto` plus `FlashBlock.ToDto()` and `FlashDocument.ToBlockDtos()` for owned data export.
+- Added `FlashUdsExportOptions` and `FlashDocument.ToUdsBlockDtos(...)` for UDS-sized owned block export with gap filling, blank-page skipping, and 32-bit address checks.
+- Documented pooled-memory lifetime rules and DTO copy semantics.
+
 ## 1.0.1-preview.1 - 2026-05-20
 
 - Added `FlashLoadOptions` and `RecordsAfterEndOfFileBehavior` for configurable strict and lenient parsing.
