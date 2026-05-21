@@ -324,9 +324,11 @@ public sealed class FlashDocument : IDisposable
                 if (options.SkipBlankBlocks && !page.HasValidData)
                     continue;
 
-                var endAddress = page.StartAddress + page.AddressCount - 1;
+                var actualAddressCount = (uint)Math.Min(page.AddressCount, EndAddress - page.StartAddress + 1);
+                var actualByteCount = checked((int)(actualAddressCount * DataSize));
+                var endAddress = page.StartAddress + actualAddressCount - 1;
                 EnsureUInt32Address(page.StartAddress, endAddress, options);
-                dtos.Add(new FlashBlockDto(page.StartAddress, page.Data, DataSize));
+                dtos.Add(new FlashBlockDto(page.StartAddress, page.Data[..actualByteCount], DataSize));
             }
         }
 

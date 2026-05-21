@@ -53,6 +53,26 @@ public class FlashUdsExportTest
     }
 
     [TestMethod]
+    public void ToUdsBlockDtos_FillGaps为True_尾块不会超过文档结束地址()
+    {
+        using var doc = LoadIntel(
+            dataSize: 1,
+            TestRecordFactory.IntelData(0x0000, new byte[] { 1, 2, 3 }),
+            TestRecordFactory.IntelEndOfFile());
+        var options = new FlashFiles.FlashUdsExportOptions(maxBlockByteCount: 2)
+        {
+            PaddingValue = 0xEE,
+        };
+
+        var blocks = doc.ToUdsBlockDtos(options);
+
+        Assert.HasCount(2, blocks);
+        Assert.AreEqual(2ul, blocks[1].StartAddress);
+        Assert.AreEqual(2ul, blocks[1].EndAddress);
+        CollectionAssert.AreEqual(new byte[] { 3 }, blocks[1].Data);
+    }
+
+    [TestMethod]
     public void ToUdsBlockDtos_SkipBlankBlocks为True_跳过无源数据页()
     {
         using var doc = LoadIntel(
@@ -140,6 +160,20 @@ public class FlashUdsExportTest
         var options = new FlashFiles.FlashUdsExportOptions(maxBlockByteCount: 1);
 
         Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => doc.ToUdsBlockDtos(options));
+    }
+
+    [TestMethod]
+    public void ToUdsBlockDtos_RequireUInt32Address为True_允许文档结束于32位最大地址()
+    {
+        using var doc = CreateDocumentWithBlock(uint.MaxValue);
+        var options = new FlashFiles.FlashUdsExportOptions(maxBlockByteCount: 2);
+
+        var blocks = doc.ToUdsBlockDtos(options);
+
+        Assert.HasCount(1, blocks);
+        Assert.AreEqual((ulong)uint.MaxValue, blocks[0].StartAddress);
+        Assert.AreEqual((ulong)uint.MaxValue, blocks[0].EndAddress);
+        CollectionAssert.AreEqual(new byte[] { 0xAA }, blocks[0].Data);
     }
 
     [TestMethod]
