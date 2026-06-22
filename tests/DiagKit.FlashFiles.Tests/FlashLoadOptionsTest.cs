@@ -9,6 +9,69 @@ namespace DiagKit.FlashFiles.Tests;
 public class FlashLoadOptionsTest
 {
     [TestMethod]
+    public void Strict_与默认选项一致()
+    {
+        var strict = FlashFiles.FlashLoadOptions.Strict(dataSize: 2);
+        var defaults = new FlashFiles.FlashLoadOptions(dataSize: 2);
+
+        AssertOptionsEqual(defaults, strict);
+    }
+
+    [TestMethod]
+    public void Lenient_返回面向现场诊断的兼容选项()
+    {
+        var options = FlashFiles.FlashLoadOptions.Lenient(dataSize: 2);
+
+        Assert.AreEqual(2, options.DataSize);
+        Assert.IsTrue(options.ValidateChecksums);
+        Assert.IsFalse(options.RequireEndOfFile);
+        Assert.AreEqual(FlashFiles.RecordsAfterEndOfFileBehavior.Ignore, options.RecordsAfterEndOfFileBehavior);
+        Assert.IsFalse(options.ValidateNonDataRecordAddress);
+        Assert.IsFalse(options.ValidateRecordTypeLength);
+        Assert.IsTrue(options.ValidateDataRecordLength);
+        Assert.AreEqual(0xFF, options.DataRecordPaddingValue);
+        Assert.IsFalse(options.ValidateMotorolaHeaderPosition);
+        Assert.IsFalse(options.ValidateMotorolaCountRecord);
+    }
+
+    [TestMethod]
+    public void SupplierCompatible_返回供应商文件兼容选项且仍验证校验和()
+    {
+        var options = FlashFiles.FlashLoadOptions.SupplierCompatible(dataSize: 2);
+
+        Assert.AreEqual(2, options.DataSize);
+        Assert.IsTrue(options.ValidateChecksums);
+        Assert.IsFalse(options.RequireEndOfFile);
+        Assert.AreEqual(FlashFiles.RecordsAfterEndOfFileBehavior.Parse, options.RecordsAfterEndOfFileBehavior);
+        Assert.IsFalse(options.ValidateNonDataRecordAddress);
+        Assert.IsFalse(options.ValidateRecordTypeLength);
+        Assert.IsFalse(options.ValidateDataRecordLength);
+        Assert.AreEqual(0xFF, options.DataRecordPaddingValue);
+        Assert.IsFalse(options.ValidateMotorolaHeaderPosition);
+        Assert.IsFalse(options.ValidateMotorolaCountRecord);
+    }
+
+    [TestMethod]
+    public void Profile_每次调用_返回独立实例()
+    {
+        var first = FlashFiles.FlashLoadOptions.SupplierCompatible(dataSize: 1);
+        var second = FlashFiles.FlashLoadOptions.SupplierCompatible(dataSize: 1);
+
+        first.ValidateChecksums = false;
+
+        Assert.IsFalse(first.ValidateChecksums);
+        Assert.IsTrue(second.ValidateChecksums);
+    }
+
+    [TestMethod]
+    public void Profile_DataSize为零_抛出异常()
+    {
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => FlashFiles.FlashLoadOptions.Strict(0));
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => FlashFiles.FlashLoadOptions.Lenient(0));
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => FlashFiles.FlashLoadOptions.SupplierCompatible(0));
+    }
+
+    [TestMethod]
     public void Intel_默认选项_缺少EOF记录时抛出异常()
     {
         using var stream = TestRecordFactory.ToStream(
@@ -233,4 +296,18 @@ public class FlashLoadOptionsTest
 
     private static string WithInvalidChecksum(string record)
         => record[..^2] + (record.EndsWith("00", StringComparison.Ordinal) ? "01" : "00");
+
+    private static void AssertOptionsEqual(FlashFiles.FlashLoadOptions expected, FlashFiles.FlashLoadOptions actual)
+    {
+        Assert.AreEqual(expected.DataSize, actual.DataSize);
+        Assert.AreEqual(expected.ValidateChecksums, actual.ValidateChecksums);
+        Assert.AreEqual(expected.RequireEndOfFile, actual.RequireEndOfFile);
+        Assert.AreEqual(expected.RecordsAfterEndOfFileBehavior, actual.RecordsAfterEndOfFileBehavior);
+        Assert.AreEqual(expected.ValidateNonDataRecordAddress, actual.ValidateNonDataRecordAddress);
+        Assert.AreEqual(expected.ValidateRecordTypeLength, actual.ValidateRecordTypeLength);
+        Assert.AreEqual(expected.ValidateDataRecordLength, actual.ValidateDataRecordLength);
+        Assert.AreEqual(expected.DataRecordPaddingValue, actual.DataRecordPaddingValue);
+        Assert.AreEqual(expected.ValidateMotorolaHeaderPosition, actual.ValidateMotorolaHeaderPosition);
+        Assert.AreEqual(expected.ValidateMotorolaCountRecord, actual.ValidateMotorolaCountRecord);
+    }
 }

@@ -33,24 +33,58 @@ using var fromBytes = FlashDocument.Load(data, FlashFileType.Motorola_S_Record, 
 Parsing is strict by default. Checksums, Intel EOF records, Motorola termination records, record type lengths, non-data record address rules, S-Record header/count rules, and `DataSize` alignment are validated unless explicitly relaxed.
 
 ```csharp
-var options = new FlashLoadOptions(dataSize: 2)
-{
-    // Use only for field diagnostics or compatibility with non-standard supplier files.
-    ValidateChecksums = false,
-    RequireEndOfFile = false,
-    RecordsAfterEndOfFileBehavior = RecordsAfterEndOfFileBehavior.Parse,
-    ValidateNonDataRecordAddress = false,
-    ValidateRecordTypeLength = false,
-    ValidateDataRecordLength = false,
-    DataRecordPaddingValue = 0xFF,
-    ValidateMotorolaHeaderPosition = false,
-    ValidateMotorolaCountRecord = false,
-};
+// Same behavior as the default constructor and existing Load overloads.
+var strict = FlashLoadOptions.Strict(dataSize: 2);
 
-using var lenient = FlashDocument.Load("supplier.hex", options);
+// Field diagnostics: tolerate common format noise, but still validate checksums and DataSize alignment.
+var lenient = FlashLoadOptions.Lenient(dataSize: 2);
+
+// Supplier compatibility: continue after EOF/termination and pad unaligned data records.
+// Checksum validation remains enabled by default.
+var supplierCompatible = FlashLoadOptions.SupplierCompatible(dataSize: 2);
+
+using var supplier = FlashDocument.Load("supplier.hex", supplierCompatible);
+```
+
+Advanced callers can still tune individual parser behaviors:
+
+```csharp
+var options = FlashLoadOptions.SupplierCompatible(dataSize: 2);
+options.ValidateChecksums = false; // Use only for field diagnostics or trusted supplier recovery.
+options.DataRecordPaddingValue = 0xFF;
+
+using var lenientDocument = FlashDocument.Load("supplier.hex", options);
 ```
 
 `RecordsAfterEndOfFileBehavior.Reject` preserves the default standard behavior, `Ignore` stops at the first EOF/termination record, and `Parse` continues reading valid records after it.
+
+## Data Ownership
+
+`FlashDocument`, `FlashBlock`, and `FlashPage` use pooled memory and implement `IDisposable`. Spans and `ReadOnlyMemory<byte>` views are only valid while the owning object is alive. Use DTO export when data needs to cross service/UI boundaries or outlive the document:
+
+```csharp
+using var doc = FlashDocument.Load("firmware.hex", dataSize: 2);
+
+IReadOnlyList<FlashBlockDto> ownedBlocks = doc.ToBlockDtos();
+byte[] firstBlockData = ownedBlocks[0].Data;
+```
+
+Each `FlashBlockDto` owns a copied `byte[]` and does not need to be disposed.
+
+## Create Documents from Memory
+
+Use `FlashDocument.Create(...)` when flash payloads already exist as raw address-mapped bytes, such as data reconstructed from UDS `TransferData` records. This API copies input data, sorts blocks by address, merges adjacent blocks, and rejects overlapping blocks or mixed `DataSize` values.
+
+```csharp
+var appBlock = new FlashBlockDto(
+    startAddress: 0xA0100000,
+    data: appPayload,
+    dataSize: 1);
+
+using var doc = FlashDocument.Create(new[] { appBlock });
+using var output = File.Create("app.hex");
+doc.Save(output, FlashFileType.Intel_MCS_86);
+```
 
 ## Core API
 
@@ -71,7 +105,16 @@ var range = doc.ReadRange(0x003E8500, 0x003E850F);
 doc.WriteAt(0x003E8500, new byte[] { 0xAA, 0xBB });
 doc.WriteRange(0x003E8500, 0x003E8501, new byte[] { 0xAA, 0xBB, 0xCC, 0xDD });
 
-// UDS page filling
+// UDS DTO export. Blocks own copied data and do not require Dispose.
+var udsBlocks = doc.ToUdsBlockDtos(new FlashUdsExportOptions(maxBlockByteCount: 0x400)
+{
+    PaddingValue = 0xFF,
+    FillGaps = true,
+    SkipBlankBlocks = true,
+    RequireUInt32Address = true,
+});
+
+// Low-level UDS page filling
 using var page = new FlashPage(addressCount: 0x100, dataSize: 2);
 var hasData = doc.TryFillPage(page, doc.StartAddress);
 

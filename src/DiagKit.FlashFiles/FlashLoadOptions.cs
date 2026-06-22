@@ -17,6 +17,44 @@ public sealed class FlashLoadOptions
     }
 
     /// <summary>
+    /// 创建标准严格解析选项。<br/>Creates standard strict parsing options.
+    /// </summary>
+    /// <param name="dataSize">每个地址映射的字节数。<br/>The number of bytes mapped to each address.</param>
+    public static FlashLoadOptions Strict(byte dataSize) => new(dataSize);
+
+    /// <summary>
+    /// 创建现场诊断兼容解析选项，仍验证校验和与数据长度对齐。<br/>Creates field-diagnostics compatible parsing options while still validating checksums and data length alignment.
+    /// </summary>
+    /// <param name="dataSize">每个地址映射的字节数。<br/>The number of bytes mapped to each address.</param>
+    public static FlashLoadOptions Lenient(byte dataSize)
+        => new(dataSize)
+        {
+            RequireEndOfFile = false,
+            RecordsAfterEndOfFileBehavior = RecordsAfterEndOfFileBehavior.Ignore,
+            ValidateNonDataRecordAddress = false,
+            ValidateRecordTypeLength = false,
+            ValidateMotorolaHeaderPosition = false,
+            ValidateMotorolaCountRecord = false,
+        };
+
+    /// <summary>
+    /// 创建供应商文件兼容解析选项，默认仍验证校验和。<br/>Creates supplier-file compatible parsing options while keeping checksum validation enabled by default.
+    /// </summary>
+    /// <param name="dataSize">每个地址映射的字节数。<br/>The number of bytes mapped to each address.</param>
+    public static FlashLoadOptions SupplierCompatible(byte dataSize)
+        => new(dataSize)
+        {
+            RequireEndOfFile = false,
+            RecordsAfterEndOfFileBehavior = RecordsAfterEndOfFileBehavior.Parse,
+            ValidateNonDataRecordAddress = false,
+            ValidateRecordTypeLength = false,
+            ValidateDataRecordLength = false,
+            DataRecordPaddingValue = 0xFF,
+            ValidateMotorolaHeaderPosition = false,
+            ValidateMotorolaCountRecord = false,
+        };
+
+    /// <summary>
     /// 每个地址映射的字节数。<br/>The number of bytes mapped to each address.
     /// </summary>
     public byte DataSize

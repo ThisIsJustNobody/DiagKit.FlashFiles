@@ -1,3 +1,4 @@
+using DiagKit.FlashFiles.Common.Utilities;
 using DiagKit.FlashFiles.Define.Enumerates;
 
 using System.Text;
@@ -103,6 +104,59 @@ public sealed class FlashDocument : IDisposable
         return new FlashDocument(blocks, options.DataSize);
     }
 
+    /// <summary>
+    /// 从原始地址映射数据创建 Flash 文档。输入数据会被复制，不会解析 HEX/S-Record 文本。<br/>
+    /// Creates a Flash document from raw address-mapped data. The input data is copied and is not parsed as HEX/S-Record text.
+    /// </summary>
+    /// <param name="startAddress">数据起始地址。<br/>The start address of the data.</param>
+    /// <param name="data">原始数据。<br/>The raw data.</param>
+    /// <param name="dataSize">每个地址映射的字节数。<br/>The number of bytes mapped to each address.</param>
+    public static FlashDocument Create(ulong startAddress, ReadOnlySpan<byte> data, byte dataSize)
+    {
+        var block = new FlashBlockDto(startAddress, data, dataSize);
+        return Create([block]);
+    }
+
+    /// <summary>
+    /// 从原始地址映射数据块创建 Flash 文档。输入数据会被复制，不会解析 HEX/S-Record 文本。<br/>
+    /// Creates a Flash document from raw address-mapped data blocks. The input data is copied and is not parsed as HEX/S-Record text.
+    /// </summary>
+    /// <param name="blocks">原始数据块。<br/>The raw data blocks.</param>
+    public static FlashDocument Create(IEnumerable<FlashBlockDto> blocks)
+    {
+        ArgumentNullException.ThrowIfNull(blocks);
+
+        var dtos = new List<FlashBlockDto>();
+        foreach (var block in blocks)
+        {
+            if (block is null)
+                throw new ArgumentException("数据块集合不能包含 null。", nameof(blocks));
+            dtos.Add(block);
+        }
+
+        if (dtos.Count == 0)
+            throw new ArgumentException("数据块集合不能为空。", nameof(blocks));
+
+        dtos.Sort(static (a, b) => a.StartAddress.CompareTo(b.StartAddress));
+        var dataSize = dtos[0].DataSize;
+        var segments = new List<ParsedDataSegment>(dtos.Count);
+        FlashBlockDto? previous = null;
+
+        foreach (var dto in dtos)
+        {
+            if (dto.DataSize != dataSize)
+                throw new ArgumentException("所有数据块的 DataSize 必须一致。", nameof(blocks));
+
+            if (previous is not null && dto.StartAddress <= previous.EndAddress)
+                throw new ArgumentException($"存在重复或重叠地址的数据块，地址：0x{dto.StartAddress:X8}。", nameof(blocks));
+
+            ParserBlockBuilder.AddSegment(segments, dto.StartAddress, dto.Data, dataSize, lineNumber: 0);
+            previous = dto;
+        }
+
+        return new FlashDocument(ParserBlockBuilder.BuildBlocks(segments, dataSize), dataSize);
+    }
+
     #endregion
 
     #region 保存
@@ -116,6 +170,7 @@ public sealed class FlashDocument : IDisposable
         switch (format)
         {
             case FlashFileType.Intel_MCS_86:
+                EnsureIntelHexAddressRange();
                 IntelMcs86.Writer.Write(stream, blocks, DataSize);
                 break;
             case FlashFileType.Motorola_S_Record:
@@ -141,6 +196,15 @@ public sealed class FlashDocument : IDisposable
 
         using var fs = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None, bufferSize: 4096);
         Save(fs, format);
+    }
+
+    private void EnsureIntelHexAddressRange()
+    {
+        foreach (var block in blocks)
+        {
+            if (block.EndAddress > uint.MaxValue)
+                throw new InvalidOperationException($"Intel MCS-86 HEX 仅支持 32-bit 线性地址，数据块结束地址 0x{block.EndAddress:X} 超出 0xFFFFFFFF。");
+        }
     }
 
     #endregion
@@ -227,6 +291,18 @@ public sealed class FlashDocument : IDisposable
         blocks[index].WriteRange(startAddress, endAddress, data);
     }
 
+    /// <summary>
+    /// 导出拥有数据副本的块 DTO 列表。<br/>Exports block DTOs that own copied data buffers.
+    /// </summary>
+    public IReadOnlyList<FlashBlockDto> ToBlockDtos()
+    {
+        ObjectDisposedException.ThrowIf(disposedValue, this);
+        var dtos = new List<FlashBlockDto>(blocks.Count);
+        foreach (var block in blocks)
+            dtos.Add(block.ToDto());
+        return dtos.AsReadOnly();
+    }
+
     /// <summary>二分查找包含指定地址的块索引，未找到返回 -1。</summary>
     private int FindBlockIndex(ulong address)
     {
@@ -282,6 +358,81 @@ public sealed class FlashDocument : IDisposable
             if (counted + 1 < expectedCount)
                 currentAddress += page.AddressCount;
         }
+    }
+
+    /// <summary>
+    /// 导出面向 UDS 传输的拥有数据块 DTO。<br/>Exports owned data block DTOs for UDS transfer.
+    /// </summary>
+    public IReadOnlyList<FlashBlockDto> ToUdsBlockDtos(FlashUdsExportOptions options)
+    {
+        ObjectDisposedException.ThrowIf(disposedValue, this);
+        ArgumentNullException.ThrowIfNull(options);
+        if (blocks.Count == 0)
+            return Array.Empty<FlashBlockDto>();
+        if (options.MaxBlockByteCount % DataSize != 0)
+            throw new ArgumentException("最大块字节数必须是 DataSize 的整数倍。", nameof(options));
+
+        var addressCount = options.MaxBlockByteCount / DataSize;
+        return options.FillGaps
+            ? ToUdsBlockDtosWithGaps(options, addressCount)
+            : ToUdsBlockDtosWithoutGaps(options, addressCount);
+    }
+
+    private IReadOnlyList<FlashBlockDto> ToUdsBlockDtosWithGaps(FlashUdsExportOptions options, uint addressCount)
+    {
+        var dtos = new List<FlashBlockDto>();
+        foreach (var page in EnumeratePages(addressCount, StartAddress, EndAddress, options.PaddingValue))
+        {
+            using (page)
+            {
+                if (options.SkipBlankBlocks && !page.HasValidData)
+                    continue;
+
+                var actualAddressCount = (uint)Math.Min(page.AddressCount, EndAddress - page.StartAddress + 1);
+                var actualByteCount = checked((int)(actualAddressCount * DataSize));
+                var endAddress = page.StartAddress + actualAddressCount - 1;
+                EnsureUInt32Address(page.StartAddress, endAddress, options);
+                dtos.Add(new FlashBlockDto(page.StartAddress, page.Data[..actualByteCount], DataSize));
+            }
+        }
+
+        return dtos.AsReadOnly();
+    }
+
+    private IReadOnlyList<FlashBlockDto> ToUdsBlockDtosWithoutGaps(FlashUdsExportOptions options, uint addressCount)
+    {
+        var dtos = new List<FlashBlockDto>();
+        foreach (var block in blocks)
+        {
+            var remainingAddressCount = block.AddressCount;
+            var currentAddress = block.StartAddress;
+            var byteOffset = 0;
+
+            while (remainingAddressCount > 0)
+            {
+                var chunkAddressCount = Math.Min(addressCount, remainingAddressCount);
+                var chunkByteCount = checked((int)(chunkAddressCount * DataSize));
+                var endAddress = currentAddress + chunkAddressCount - 1;
+
+                EnsureUInt32Address(currentAddress, endAddress, options);
+                dtos.Add(new FlashBlockDto(currentAddress, block.Data.Span.Slice(byteOffset, chunkByteCount), DataSize));
+
+                remainingAddressCount -= chunkAddressCount;
+                byteOffset += chunkByteCount;
+                if (remainingAddressCount > 0)
+                    currentAddress += chunkAddressCount;
+            }
+        }
+
+        return dtos.AsReadOnly();
+    }
+
+    private static void EnsureUInt32Address(ulong startAddress, ulong endAddress, FlashUdsExportOptions options)
+    {
+        if (!options.RequireUInt32Address)
+            return;
+        if (startAddress > uint.MaxValue || endAddress > uint.MaxValue)
+            throw new ArgumentOutOfRangeException(nameof(options), "导出块地址必须位于 32-bit 范围内。");
     }
 
     private static List<string> ReadLines(ReadOnlySpan<byte> data)
