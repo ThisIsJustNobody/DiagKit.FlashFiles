@@ -1,8 +1,6 @@
 using DiagKit.FlashFiles.Define.Enumerates;
 using DiagKit.FlashFiles.Tests;
 
-using System.Reflection;
-
 namespace DiagKit.FlashFiles.Tests.Common;
 
 /// <summary>
@@ -220,17 +218,6 @@ public class FlashUdsExportTest
 
     private static FlashFiles.FlashDocument CreateDocumentWithBlock(ulong startAddress)
     {
-        var block = new FlashFiles.FlashBlock(capacity: 1, startAddress, dataSize: 1);
-        block.WriteAt(startAddress, new byte[] { 0xAA });
-        var blocks = new List<FlashFiles.FlashBlock> { block };
-
-        var constructor = typeof(FlashFiles.FlashDocument).GetConstructor(
-            BindingFlags.Instance | BindingFlags.NonPublic,
-            binder: null,
-            [typeof(List<FlashFiles.FlashBlock>), typeof(byte)],
-            modifiers: null);
-
-        Assert.IsNotNull(constructor);
-        return (FlashFiles.FlashDocument)constructor.Invoke([blocks, (byte)1]);
+        return FlashFiles.FlashDocument.Create(startAddress, new byte[] { 0xAA }, dataSize: 1);
     }
 }
