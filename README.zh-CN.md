@@ -71,6 +71,21 @@ byte[] firstBlockData = ownedBlocks[0].Data;
 
 每个 `FlashBlockDto` 都拥有复制后的 `byte[]`，不需要调用 `Dispose`。
 
+## 从内存创建文档
+
+当刷写载荷已经是带地址的原始字节数据时，例如从 UDS `TransferData` 记录还原出的数据，可以使用 `FlashDocument.Create(...)` 创建文档。该 API 会复制输入数据、按地址排序、合并相邻块，并拒绝重叠地址块或混用 `DataSize` 的输入。
+
+```csharp
+var appBlock = new FlashBlockDto(
+    startAddress: 0xA0100000,
+    data: appPayload,
+    dataSize: 1);
+
+using var doc = FlashDocument.Create(new[] { appBlock });
+using var output = File.Create("app.hex");
+doc.Save(output, FlashFileType.Intel_MCS_86);
+```
+
 ## 核心 API
 
 ```csharp

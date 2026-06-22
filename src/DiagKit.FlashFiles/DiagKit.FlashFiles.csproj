@@ -34,7 +34,7 @@
     <PackageIcon>diagkit-flashfiles.png</PackageIcon>
 
     <!-- Release -->
-    <PackageReleaseNotes>Add profile-based load options, owned Flash block DTO export, and UDS block DTO export helpers.</PackageReleaseNotes>
+    <PackageReleaseNotes>Add FlashDocument.Create factory methods for raw address-mapped memory data and validate Intel HEX 32-bit address limits.</PackageReleaseNotes>
 
     <!-- URL -->
     <PackageProjectUrl>https://github.com/ThisIsJustNobody/DiagKit.FlashFiles</PackageProjectUrl>

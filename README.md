@@ -71,6 +71,21 @@ byte[] firstBlockData = ownedBlocks[0].Data;
 
 Each `FlashBlockDto` owns a copied `byte[]` and does not need to be disposed.
 
+## Create Documents from Memory
+
+Use `FlashDocument.Create(...)` when flash payloads already exist as raw address-mapped bytes, such as data reconstructed from UDS `TransferData` records. This API copies input data, sorts blocks by address, merges adjacent blocks, and rejects overlapping blocks or mixed `DataSize` values.
+
+```csharp
+var appBlock = new FlashBlockDto(
+    startAddress: 0xA0100000,
+    data: appPayload,
+    dataSize: 1);
+
+using var doc = FlashDocument.Create(new[] { appBlock });
+using var output = File.Create("app.hex");
+doc.Save(output, FlashFileType.Intel_MCS_86);
+```
+
 ## Core API
 
 ```csharp

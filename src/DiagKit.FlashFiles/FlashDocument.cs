@@ -1,3 +1,4 @@
+using DiagKit.FlashFiles.Common.Utilities;
 using DiagKit.FlashFiles.Define.Enumerates;
 
 using System.Text;
@@ -103,6 +104,59 @@ public sealed class FlashDocument : IDisposable
         return new FlashDocument(blocks, options.DataSize);
     }
 
+    /// <summary>
+    /// 从原始地址映射数据创建 Flash 文档。输入数据会被复制，不会解析 HEX/S-Record 文本。<br/>
+    /// Creates a Flash document from raw address-mapped data. The input data is copied and is not parsed as HEX/S-Record text.
+    /// </summary>
+    /// <param name="startAddress">数据起始地址。<br/>The start address of the data.</param>
+    /// <param name="data">原始数据。<br/>The raw data.</param>
+    /// <param name="dataSize">每个地址映射的字节数。<br/>The number of bytes mapped to each address.</param>
+    public static FlashDocument Create(ulong startAddress, ReadOnlySpan<byte> data, byte dataSize)
+    {
+        var block = new FlashBlockDto(startAddress, data, dataSize);
+        return Create([block]);
+    }
+
+    /// <summary>
+    /// 从原始地址映射数据块创建 Flash 文档。输入数据会被复制，不会解析 HEX/S-Record 文本。<br/>
+    /// Creates a Flash document from raw address-mapped data blocks. The input data is copied and is not parsed as HEX/S-Record text.
+    /// </summary>
+    /// <param name="blocks">原始数据块。<br/>The raw data blocks.</param>
+    public static FlashDocument Create(IEnumerable<FlashBlockDto> blocks)
+    {
+        ArgumentNullException.ThrowIfNull(blocks);
+
+        var dtos = new List<FlashBlockDto>();
+        foreach (var block in blocks)
+        {
+            if (block is null)
+                throw new ArgumentException("数据块集合不能包含 null。", nameof(blocks));
+            dtos.Add(block);
+        }
+
+        if (dtos.Count == 0)
+            throw new ArgumentException("数据块集合不能为空。", nameof(blocks));
+
+        dtos.Sort(static (a, b) => a.StartAddress.CompareTo(b.StartAddress));
+        var dataSize = dtos[0].DataSize;
+        var segments = new List<ParsedDataSegment>(dtos.Count);
+        FlashBlockDto? previous = null;
+
+        foreach (var dto in dtos)
+        {
+            if (dto.DataSize != dataSize)
+                throw new ArgumentException("所有数据块的 DataSize 必须一致。", nameof(blocks));
+
+            if (previous is not null && dto.StartAddress <= previous.EndAddress)
+                throw new ArgumentException($"存在重复或重叠地址的数据块，地址：0x{dto.StartAddress:X8}。", nameof(blocks));
+
+            ParserBlockBuilder.AddSegment(segments, dto.StartAddress, dto.Data, dataSize, lineNumber: 0);
+            previous = dto;
+        }
+
+        return new FlashDocument(ParserBlockBuilder.BuildBlocks(segments, dataSize), dataSize);
+    }
+
     #endregion
 
     #region 保存
@@ -116,6 +170,7 @@ public sealed class FlashDocument : IDisposable
         switch (format)
         {
             case FlashFileType.Intel_MCS_86:
+                EnsureIntelHexAddressRange();
                 IntelMcs86.Writer.Write(stream, blocks, DataSize);
                 break;
             case FlashFileType.Motorola_S_Record:
@@ -141,6 +196,15 @@ public sealed class FlashDocument : IDisposable
 
         using var fs = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None, bufferSize: 4096);
         Save(fs, format);
+    }
+
+    private void EnsureIntelHexAddressRange()
+    {
+        foreach (var block in blocks)
+        {
+            if (block.EndAddress > uint.MaxValue)
+                throw new InvalidOperationException($"Intel MCS-86 HEX 仅支持 32-bit 线性地址，数据块结束地址 0x{block.EndAddress:X} 超出 0xFFFFFFFF。");
+        }
     }
 
     #endregion
