@@ -188,15 +188,27 @@ public sealed class FlashDocument : IDisposable
         ArgumentNullException.ThrowIfNull(filePath);
 
         var ext = Path.GetExtension(filePath).ToLowerInvariant();
-        var format = ext switch
+        if (ext == ".hex")
         {
-            ".hex" => FlashFileType.Intel_MCS_86,
-            ".s19" or ".s28" or ".s37" => throw new NotSupportedException("Motorola S-Record 格式的写入暂未实现。"),
-            _ => throw new NotSupportedException($"不支持的文件格式：{ext}"),
+            using var fs = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None, bufferSize: 4096);
+            Save(fs, FlashFileType.Intel_MCS_86);
+            return;
+        }
+
+        var sRecordFormat = ext switch
+        {
+            ".s19" => MotorolaSRecord.SRecordFormat.S19,
+            ".s28" => MotorolaSRecord.SRecordFormat.S28,
+            ".s37" => MotorolaSRecord.SRecordFormat.S37,
+            _ => (MotorolaSRecord.SRecordFormat?)null,
         };
 
-        using var fs = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None, bufferSize: 4096);
-        Save(fs, format);
+        if (sRecordFormat is null)
+            throw new NotSupportedException($"不支持的文件格式：{ext}");
+
+        MotorolaSRecord.Writer.ValidateCanWrite(blocks, DataSize, sRecordFormat.Value);
+        using (var fs = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None, bufferSize: 4096))
+            MotorolaSRecord.Writer.Write(fs, blocks, DataSize, sRecordFormat.Value);
     }
 
     private void EnsureIntelHexAddressRange()

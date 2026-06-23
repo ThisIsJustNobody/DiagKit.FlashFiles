@@ -38,13 +38,7 @@ internal static class Writer
     /// </summary>
     internal static void Write(Stream stream, IReadOnlyList<FlashBlock> blocks, byte dataSize, SRecordFormat format)
     {
-        if (dataSize == 0)
-            throw new ArgumentOutOfRangeException(nameof(dataSize), "地址数据大小必须大于 0。");
-        if (dataSize > MaxDataBytesPerRecord)
-            throw new ArgumentOutOfRangeException(nameof(dataSize), $"地址数据大小不能超过单条记录的数据字节上限 {MaxDataBytesPerRecord}。");
-
-        ValidateAddressRange(blocks, format);
-        var dataRecordCount = CountDataRecords(blocks, dataSize);
+        var dataRecordCount = ValidateCanWriteCore(blocks, dataSize, format);
 
         using var writer = new StreamWriter(stream, Utf8NoBom, bufferSize: 8192, leaveOpen: true);
 
@@ -73,6 +67,25 @@ internal static class Writer
         WriteCountRecord(writer, dataRecordCount);
         WriteRecord(writer, GetTerminationRecordType(format), 0, ReadOnlySpan<byte>.Empty);
         writer.Flush();
+    }
+
+    /// <summary>
+    /// 验证指定 S-Record 子格式是否可写入。
+    /// </summary>
+    internal static void ValidateCanWrite(IReadOnlyList<FlashBlock> blocks, byte dataSize, SRecordFormat format)
+    {
+        _ = ValidateCanWriteCore(blocks, dataSize, format);
+    }
+
+    private static ulong ValidateCanWriteCore(IReadOnlyList<FlashBlock> blocks, byte dataSize, SRecordFormat format)
+    {
+        if (dataSize == 0)
+            throw new ArgumentOutOfRangeException(nameof(dataSize), "地址数据大小必须大于 0。");
+        if (dataSize > MaxDataBytesPerRecord)
+            throw new ArgumentOutOfRangeException(nameof(dataSize), $"地址数据大小不能超过单条记录的数据字节上限 {MaxDataBytesPerRecord}。");
+
+        ValidateAddressRange(blocks, format);
+        return CountDataRecords(blocks, dataSize);
     }
 
     private static SRecordFormat SelectSmallestFormat(IReadOnlyList<FlashBlock> blocks)
