@@ -21,6 +21,7 @@ internal enum SRecordFormat
 internal static class Writer
 {
     private const int MaxDataBytesPerRecord = 16;
+    private const ulong MaxCountRecordDataRecordCount = 0xFFFFFFUL;
     private static readonly UTF8Encoding Utf8NoBom = new(encoderShouldEmitUTF8Identifier: false);
     private static readonly byte[] HeaderData = Encoding.ASCII.GetBytes("DiagKit.FlashFiles");
 
@@ -131,8 +132,8 @@ internal static class Writer
                     throw new InvalidOperationException("无法写入完整地址数据。");
 
                 dataRecordCount++;
-                if (dataRecordCount > ushort.MaxValue)
-                    throw new InvalidOperationException("Motorola S-Record 数据记录数量超过 S5 计数记录范围。");
+                if (dataRecordCount > MaxCountRecordDataRecordCount)
+                    throw new InvalidOperationException($"Motorola S-Record 数据记录数量 0x{dataRecordCount:X} 超出 S6 计数记录范围。");
 
                 offset += bytesToWrite;
             }
@@ -175,10 +176,19 @@ internal static class Writer
 
     private static void WriteCountRecord(StreamWriter writer, ulong dataRecordCount)
     {
-        if (dataRecordCount > ushort.MaxValue)
-            throw new InvalidOperationException("Motorola S-Record 数据记录数量超过 S5 计数记录范围。");
+        if (dataRecordCount <= ushort.MaxValue)
+        {
+            WriteRecord(writer, RecordType.S5, dataRecordCount, ReadOnlySpan<byte>.Empty);
+            return;
+        }
 
-        WriteRecord(writer, RecordType.S5, dataRecordCount, ReadOnlySpan<byte>.Empty);
+        if (dataRecordCount <= MaxCountRecordDataRecordCount)
+        {
+            WriteRecord(writer, RecordType.S6, dataRecordCount, ReadOnlySpan<byte>.Empty);
+            return;
+        }
+
+        throw new InvalidOperationException($"Motorola S-Record 数据记录数量 0x{dataRecordCount:X} 超出 S6 计数记录范围。");
     }
 
     private static void WriteRecord(StreamWriter writer, RecordType recordType, ulong address, ReadOnlySpan<byte> data)

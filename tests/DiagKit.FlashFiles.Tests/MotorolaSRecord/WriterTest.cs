@@ -69,6 +69,33 @@ public class WriterTest
     }
 
     [TestMethod]
+    public void Save_嵌入资源_自动写出S3和S6且可重新解析()
+    {
+        using var doc = FlashFiles.FlashDocument.Load(
+            InitializeTest.GetMotorolaSRecordStream(),
+            FlashFileType.Motorola_S_Record,
+            dataSize: 1);
+        using var stream = new MemoryStream();
+
+        doc.Save(stream, FlashFileType.Motorola_S_Record);
+
+        var text = Encoding.UTF8.GetString(stream.ToArray());
+        var lines = text.Split(
+            new[] { "\r\n", "\n" },
+            StringSplitOptions.RemoveEmptyEntries);
+        Assert.IsTrue(lines.Any(line => line.StartsWith("S3", StringComparison.Ordinal)));
+        Assert.IsTrue(lines.Any(line => line.StartsWith("S6", StringComparison.Ordinal)));
+        Assert.IsTrue(lines[^1].StartsWith("S7", StringComparison.Ordinal));
+
+        stream.Position = 0;
+        using var roundTrip = FlashFiles.FlashDocument.Load(
+            stream,
+            FlashFileType.Motorola_S_Record,
+            dataSize: 1);
+        AssertDocumentsEqual(doc, roundTrip);
+    }
+
+    [TestMethod]
     public void Save_写入流_DataSize超过单条记录数据上限时写入前失败()
     {
         using var doc = FlashFiles.FlashDocument.Create(
@@ -85,7 +112,7 @@ public class WriterTest
     }
 
     [TestMethod]
-    public void Save_写入流_数据记录数量超过S5范围时写入前失败()
+    public void Save_写入流_数据记录数量超过S5范围时写出S6计数记录()
     {
         using var doc = FlashFiles.FlashDocument.Create(
             0,
@@ -93,10 +120,18 @@ public class WriterTest
             dataSize: 1);
         using var stream = new MemoryStream();
 
-        Assert.ThrowsExactly<InvalidOperationException>(
-            () => doc.Save(stream, FlashFileType.Motorola_S_Record));
+        doc.Save(stream, FlashFileType.Motorola_S_Record);
 
-        Assert.AreEqual(0, stream.Length, "数据记录数量超过 S5 范围时必须在写入前失败。");
+        var lines = ReadLines(stream);
+        Assert.IsFalse(lines.Any(line => line.StartsWith("S5", StringComparison.Ordinal)));
+        Assert.IsTrue(lines.Any(line => line.StartsWith("S6", StringComparison.Ordinal)));
+
+        stream.Position = 0;
+        using var roundTrip = FlashFiles.FlashDocument.Load(
+            stream,
+            FlashFileType.Motorola_S_Record,
+            dataSize: 1);
+        AssertDocumentsEqual(doc, roundTrip);
     }
 
     [TestMethod]
@@ -257,5 +292,25 @@ public class WriterTest
     {
         var text = Encoding.UTF8.GetString(stream.ToArray());
         return text.Split(["\r\n", "\n"], StringSplitOptions.RemoveEmptyEntries);
+    }
+
+    private static void AssertDocumentsEqual(FlashFiles.FlashDocument expected, FlashFiles.FlashDocument actual)
+    {
+        Assert.AreEqual(expected.StartAddress, actual.StartAddress);
+        Assert.AreEqual(expected.EndAddress, actual.EndAddress);
+        Assert.AreEqual(expected.ByteCount, actual.ByteCount);
+        Assert.AreEqual(expected.AddressCount, actual.AddressCount);
+        Assert.HasCount(expected.Blocks.Count, actual.Blocks);
+
+        for (var i = 0; i < expected.Blocks.Count; i++)
+        {
+            var expectedBlock = expected.Blocks[i];
+            var actualBlock = actual.Blocks[i];
+            Assert.AreEqual(expectedBlock.StartAddress, actualBlock.StartAddress, $"第 {i} 个数据块起始地址不一致。");
+            Assert.AreEqual(expectedBlock.EndAddress, actualBlock.EndAddress, $"第 {i} 个数据块结束地址不一致。");
+            Assert.AreEqual(expectedBlock.ByteCount, actualBlock.ByteCount, $"第 {i} 个数据块字节数不一致。");
+            Assert.AreEqual(expectedBlock.AddressCount, actualBlock.AddressCount, $"第 {i} 个数据块地址数不一致。");
+            CollectionAssert.AreEqual(expectedBlock.Data.ToArray(), actualBlock.Data.ToArray(), $"第 {i} 个数据块内容不一致。");
+        }
     }
 }
