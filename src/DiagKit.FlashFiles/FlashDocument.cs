@@ -174,7 +174,8 @@ public sealed class FlashDocument : IDisposable
                 IntelMcs86.Writer.Write(stream, blocks, DataSize);
                 break;
             case FlashFileType.Motorola_S_Record:
-                throw new NotSupportedException("Motorola S-Record 格式的写入暂未实现。");
+                MotorolaSRecord.Writer.Write(stream, blocks, DataSize);
+                break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(format));
         }
