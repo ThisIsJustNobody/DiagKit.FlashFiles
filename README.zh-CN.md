@@ -132,15 +132,21 @@ var pages = doc.EnumeratePages(0x100, doc.StartAddress, doc.EndAddress).ToList()
 var filtered = FlashDocument.FilterPages(pages, skipLeadingBlank: true, skipMiddleBlank: true, skipTrailingBlank: true);
 ```
 
-## 保存 Intel HEX
+## 保存 Intel HEX 或 Motorola S-Record
 
-当前支持写出 Intel MCS-86 HEX。Motorola S-Record 写入暂未实现。
+当前支持写出 Intel MCS-86 HEX 和 Motorola S-Record。`SaveToFile` 会将 `.s19` 映射为 S1/S9 记录，`.s28` 映射为 S2/S8 记录，`.s37` 映射为 S3/S7 记录。使用 `FlashFileType.Motorola_S_Record` 写入流时，会自动选择能容纳文档最高地址的最小 S-Record 地址宽度。
 
 ```csharp
-using var output = File.Create("firmware.hex");
-doc.Save(output, FlashFileType.Intel_MCS_86);
+using var hexOutput = File.Create("firmware.hex");
+doc.Save(hexOutput, FlashFileType.Intel_MCS_86);
+
+using var sRecordOutput = new MemoryStream();
+doc.Save(sRecordOutput, FlashFileType.Motorola_S_Record); // 自动选择 S1/S2/S3；不会检查文件扩展名。
 
 doc.SaveToFile("firmware.hex");
+doc.SaveToFile("firmware.s19");
+doc.SaveToFile("firmware.s28");
+doc.SaveToFile("firmware.s37");
 ```
 
 ## CRC-32

@@ -132,15 +132,21 @@ var pages = doc.EnumeratePages(0x100, doc.StartAddress, doc.EndAddress).ToList()
 var filtered = FlashDocument.FilterPages(pages, skipLeadingBlank: true, skipMiddleBlank: true, skipTrailingBlank: true);
 ```
 
-## Save as Intel HEX
+## Save as Intel HEX or Motorola S-Record
 
-Intel MCS-86 HEX output is currently supported. Motorola S-Record writing is not yet implemented.
+Intel MCS-86 HEX and Motorola S-Record output are supported. `SaveToFile` maps `.s19` to S1/S9 records, `.s28` to S2/S8 records, and `.s37` to S3/S7 records. Stream saves with `FlashFileType.Motorola_S_Record` automatically choose the smallest S-Record address width that can contain the document's highest address.
 
 ```csharp
-using var output = File.Create("firmware.hex");
-doc.Save(output, FlashFileType.Intel_MCS_86);
+using var hexOutput = File.Create("firmware.hex");
+doc.Save(hexOutput, FlashFileType.Intel_MCS_86);
+
+using var sRecordOutput = new MemoryStream();
+doc.Save(sRecordOutput, FlashFileType.Motorola_S_Record); // Auto-selects S1/S2/S3; no file extension is inspected.
 
 doc.SaveToFile("firmware.hex");
+doc.SaveToFile("firmware.s19");
+doc.SaveToFile("firmware.s28");
+doc.SaveToFile("firmware.s37");
 ```
 
 ## CRC-32

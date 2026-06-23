@@ -34,7 +34,7 @@
     <PackageIcon>diagkit-flashfiles.png</PackageIcon>
 
     <!-- Release -->
-    <PackageReleaseNotes>Add FlashDocument.Create factory methods for raw address-mapped memory data and validate Intel HEX 32-bit address limits.</PackageReleaseNotes>
+    <PackageReleaseNotes>Add Motorola S-Record saving for streams and .s19/.s28/.s37 files, including S1/S2/S3 address-width selection and S5/S6 count records.</PackageReleaseNotes>
 
     <!-- URL -->
     <PackageProjectUrl>https://github.com/ThisIsJustNobody/DiagKit.FlashFiles</PackageProjectUrl>

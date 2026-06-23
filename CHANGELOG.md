@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 - Added `FlashLoadOptions.Strict`, `Lenient`, and `SupplierCompatible` profile factory methods.
 - Added `FlashBlockDto` plus `FlashBlock.ToDto()` and `FlashDocument.ToBlockDtos()` for owned data export.
 - Added `FlashUdsExportOptions` and `FlashDocument.ToUdsBlockDtos(...)` for UDS-sized owned block export with gap filling, blank-page skipping, and 32-bit address checks.
+- Added Motorola S-Record saving for streams and `.s19`/`.s28`/`.s37` files, including S1/S2/S3 address-width selection, S5/S6 count records, and strict round-trip validation.
 - Documented pooled-memory lifetime rules and DTO copy semantics.
 
 ## 1.0.1-preview.1 - 2026-05-20
