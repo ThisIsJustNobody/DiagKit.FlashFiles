@@ -1,0 +1,65 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Build -->
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+
+    <!-- Version -->
+    <MinVerTagPrefix>v</MinVerTagPrefix>
+    <MinVerMinimumMajorMinor>1.0</MinVerMinimumMajorMinor>
+    <MinVerDefaultPreReleaseIdentifiers>preview.0</MinVerDefaultPreReleaseIdentifiers>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+
+    <!-- Package Metadata -->
+    <PackageId>DiagKit.FlashFiles</PackageId>
+    <Authors>Eric YaRu YANG</Authors>
+    <Title>Automotive Diagnostic Flash File Parsing Library</Title>
+    <Description>Automotive diagnostic flash file parsing library, supporting Motorola S-Record and Intel MCS-86 HEX file formats.</Description>
+    <Copyright>Copyright (c) 2025-2026 Eric YaRu YANG</Copyright>
+    <PackageTags>SRecord;UDS;reflash;IntelMcs;IntelHex;MotorolaSRecord;automotive;diagnostics</PackageTags>
+
+    <!-- License -->
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+
+    <!-- Package Content -->
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>diagkit-flashfiles.png</PackageIcon>
+
+    <!-- Release -->
+    <PackageReleaseNotes>Add Motorola S-Record saving for streams and .s19/.s28/.s37 files, including S1/S2/S3 address-width selection and S5/S6 count records.</PackageReleaseNotes>
+
+    <!-- URL -->
+    <PackageProjectUrl>https://github.com/ThisIsJustNobody/DiagKit.FlashFiles</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/ThisIsJustNobody/DiagKit.FlashFiles.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+
+    <!-- Source Link + Symbols -->
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+    <None Include="..\..\assets\diagkit-flashfiles.png" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="DiagKit.FlashFiles\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MinVer" Version="7.0.0" PrivateAssets="All" />
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
+  </ItemGroup>
+
+</Project>
